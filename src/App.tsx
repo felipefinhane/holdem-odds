@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Lock, Minus, Plus, Settings, Spade, Users } from 'lucide-react'
+import { Eye, EyeOff, Hand, Lock, Minus, Plus, Settings, Spade, Users } from 'lucide-react'
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { CardPicker } from './components/CardPicker'
 import { DecisionPanel } from './components/DecisionPanel'
@@ -12,7 +12,9 @@ import { formatChips, formatPercent, parseAmount } from './lib/format'
 import { countOuts } from './lib/outs'
 import { potOdds } from './lib/potOdds'
 import { DEFAULT_CONFIG, isTableConfig } from './lib/table'
+import { DEFAULT_PREFERENCES, isPreferences } from './lib/preferences'
 import { useEquity } from './lib/useEquity'
+import { usePeek } from './lib/usePeek'
 import { useStoredState } from './lib/useStoredState'
 
 // Posições: 0-1 sua mão, 2-4 flop, 5 turn, 6 river.
@@ -37,19 +39,22 @@ export default function App() {
   const [bet, setBet] = useState('')
   const [stack, setStack] = useState(String(config.startingStack))
   // Modo "esconder": protege suas cartas e probabilidades quando o celular fica na mesa.
-  const [hidden, setHidden] = useStoredState('holdem-odds:hidden', false, (value) => typeof value === 'boolean')
+  // No modo "segurar", fica escondido e só aparece enquanto o botão está pressionado.
+  const [preferences, setPreferences] = useStoredState('holdem-odds:preferences', DEFAULT_PREFERENCES, isPreferences)
+  const [hiddenByToggle, setHiddenByToggle] = useStoredState('holdem-odds:hidden', false, (value) => typeof value === 'boolean')
+  const { peeking, handlers: peekHandlers } = usePeek()
+  const holdMode = preferences.revealMode === 'hold'
+  const hidden = holdMode ? !peeking : hiddenByToggle
 
   // Esconde sozinho quando a tela apaga ou você troca de app.
   useEffect(() => {
-    const hideOnLeave = () => document.hidden && setHidden(true)
+    const hideOnLeave = () => document.hidden && setHiddenByToggle(true)
     document.addEventListener('visibilitychange', hideOnLeave)
     return () => document.removeEventListener('visibilitychange', hideOnLeave)
-  }, [setHidden])
+  }, [setHiddenByToggle])
 
-  const toggleHidden = () => {
-    if (!hidden && active !== null && active < 2) setActive(null)
-    setHidden(!hidden)
-  }
+  // Mesmo botão, dois comportamentos: tocar alterna; segurar mostra enquanto pressionado.
+  const revealButton = holdMode ? peekHandlers : { onClick: () => setHiddenByToggle(!hiddenByToggle) }
 
   const hero = filled(slots.slice(0, 2))
   const flop = filled(slots.slice(2, 5))
@@ -121,12 +126,12 @@ export default function App() {
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={toggleHidden}
-              className={`flex h-11 w-11 items-center justify-center rounded-lg transition active:scale-95 ${
+              {...revealButton}
+              className={`flex h-11 w-11 touch-none items-center justify-center rounded-lg transition select-none active:scale-95 ${
                 hidden ? 'bg-gold/15 text-gold ring-1 ring-gold/60' : 'text-secondary active:bg-surface-container'
               }`}
-              aria-label={hidden ? 'Mostrar informações' : 'Esconder informações'}
-              aria-pressed={hidden}
+              aria-label={holdMode ? 'Segure para ver as informações' : hidden ? 'Mostrar informações' : 'Esconder informações'}
+              aria-pressed={!hidden}
             >
               {hidden ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
@@ -149,7 +154,7 @@ export default function App() {
         </div>
         {hidden ? (
           <div className="mx-auto flex max-w-[430px] items-center gap-2 px-4 pb-2 font-display text-xs font-bold text-gold">
-            <Lock size={14} /> Informações ocultas
+            <Lock size={14} /> {holdMode ? 'Segure o olho para ver' : 'Informações ocultas'}
             <span className="ml-auto flex items-center gap-1 text-secondary">
               <Users size={14} /> {opponents} {opponents === 1 ? 'oponente' : 'oponentes'}
             </span>
@@ -182,7 +187,6 @@ export default function App() {
                   card={slots[index]}
                   label={SLOT_LABELS[index]}
                   active={active === index}
-                  disabled={hidden}
                   onClick={() => setActive(index)}
                 />
                 ),
@@ -253,10 +257,18 @@ export default function App() {
             <p className="text-sm text-secondary">Seguro para deixar o celular na mesa. A mesa e os adversários continuam visíveis.</p>
             <button
               type="button"
-              onClick={toggleHidden}
-              className="mt-1 flex h-12 items-center gap-2 rounded-xl bg-gold px-6 font-display font-bold text-on-gold active:scale-95"
+              {...revealButton}
+              className="mt-1 flex h-12 touch-none items-center gap-2 rounded-xl bg-gold px-6 font-display font-bold text-on-gold select-none active:scale-95"
             >
-              <Eye size={20} /> Mostrar
+              {holdMode ? (
+                <>
+                  <Hand size={20} /> Segure para ver
+                </>
+              ) : (
+                <>
+                  <Eye size={20} /> Mostrar
+                </>
+              )}
             </button>
           </section>
         ) : result === null || advice === null ? (
@@ -310,7 +322,8 @@ export default function App() {
         )}
       </main>
 
-      {active !== null && !(hidden && active < 2) && (
+      {/* Escondido, só abre o seletor de uma carta sua se o espaço estiver vazio (não revela nada). */}
+      {active !== null && !(hidden && active < 2 && slots[active] !== null) && (
         <CardPicker
           key={active}
           title={`Escolher: ${active < 2 ? 'sua ' + SLOT_LABELS[active].toLowerCase() : SLOT_LABELS[active]}`}
@@ -325,9 +338,11 @@ export default function App() {
       {showSettings && (
         <SettingsScreen
           config={config}
+          preferences={preferences}
           onClose={() => setShowSettings(false)}
-          onSave={(next) => {
+          onSave={(next, nextPreferences) => {
             setConfig(next)
+            setPreferences(nextPreferences)
             setStack(String(next.startingStack))
             setShowSettings(false)
           }}

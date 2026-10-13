@@ -1,17 +1,20 @@
-import { AlertTriangle, ArrowLeft, ArrowLeftRight, CheckCircle2, Coins, Plus, RotateCcw, Trash2, Wallet } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ArrowLeftRight, CheckCircle2, Coins, Eye, Hand, Plus, RotateCcw, ShieldCheck, Trash2, Wallet } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { formatChips, parseAmount } from '../lib/format'
+import { DEFAULT_PREFERENCES, type Preferences, type RevealMode } from '../lib/preferences'
 import { CHIP_COLORS, type ChipColor, chipsTotal, DEFAULT_CONFIG, type TableConfig, toBigBlinds } from '../lib/table'
 import { Chip } from './Chip'
 
 type Props = {
   config: TableConfig
-  onSave: (config: TableConfig) => void
+  preferences: Preferences
+  onSave: (config: TableConfig, preferences: Preferences) => void
   onClose: () => void
 }
 
-export function SettingsScreen({ config, onSave, onClose }: Props) {
+export function SettingsScreen({ config, preferences, onSave, onClose }: Props) {
   const [draft, setDraft] = useState(config)
+  const [draftPreferences, setDraftPreferences] = useState(preferences)
   const [adding, setAdding] = useState(false)
   const update = (patch: Partial<TableConfig>) => setDraft({ ...draft, ...patch })
   const updateChip = (index: number, patch: Partial<TableConfig['chips'][number]>) =>
@@ -161,9 +164,41 @@ export function SettingsScreen({ config, onSave, onClose }: Props) {
             </div>
           </Card>
 
+          <Card icon={<ShieldCheck size={20} />} title="Privacidade">
+            <p className="mb-2 text-sm text-secondary">Como o botão de olho mostra suas cartas e probabilidades escondidas:</p>
+            <div className="space-y-2" role="radiogroup" aria-label="Modo de privacidade">
+              {REVEAL_MODES.map(({ mode, icon, title, description }) => {
+                const selected = draftPreferences.revealMode === mode
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setDraftPreferences({ ...draftPreferences, revealMode: mode })}
+                    className={`flex w-full items-start gap-3 rounded-lg p-3 text-left transition ${
+                      selected ? 'bg-gold/10 ring-2 ring-gold' : 'bg-surface-lowest ring-1 ring-surface-highest'
+                    }`}
+                  >
+                    <span className={`mt-0.5 ${selected ? 'text-gold' : 'text-secondary'}`}>{icon}</span>
+                    <span className="flex-1">
+                      <span className="block font-display font-semibold">{title}</span>
+                      <span className="block text-xs text-secondary">{description}</span>
+                    </span>
+                    <span
+                      className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${selected ? 'border-gold' : 'border-outline'}`}
+                    >
+                      {selected && <span className="h-2.5 w-2.5 rounded-full bg-gold" />}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </Card>
+
           <button
             type="button"
-            onClick={() => onSave(draft)}
+            onClick={() => onSave(draft, draftPreferences)}
             disabled={draft.bigBlind <= 0 || draft.chips.length === 0}
             className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-gold font-display text-lg font-bold text-on-gold shadow-[0_0_16px_rgba(245,197,66,0.35)] active:scale-[0.98] disabled:opacity-40"
           >
@@ -171,7 +206,10 @@ export function SettingsScreen({ config, onSave, onClose }: Props) {
           </button>
           <button
             type="button"
-            onClick={() => setDraft(DEFAULT_CONFIG)}
+            onClick={() => {
+              setDraft(DEFAULT_CONFIG)
+              setDraftPreferences(DEFAULT_PREFERENCES)
+            }}
             className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-surface-container font-display font-semibold text-secondary"
           >
             <RotateCcw size={18} /> Restaurar padrão
@@ -181,6 +219,21 @@ export function SettingsScreen({ config, onSave, onClose }: Props) {
     </div>
   )
 }
+
+const REVEAL_MODES: { mode: RevealMode; icon: ReactNode; title: string; description: string }[] = [
+  {
+    mode: 'toggle',
+    icon: <Eye size={22} />,
+    title: 'Tocar para mostrar/esconder',
+    description: 'Um toque esconde, outro mostra. Esconde sozinho quando a tela apaga.',
+  },
+  {
+    mode: 'hold',
+    icon: <Hand size={22} />,
+    title: 'Segurar para espiar',
+    description: 'Fica sempre escondido e só aparece enquanto você segura o olho. Ao soltar, esconde de novo.',
+  },
+]
 
 function Card({ icon, title, aside, children }: { icon: ReactNode; title: string; aside?: ReactNode; children: ReactNode }) {
   return (
