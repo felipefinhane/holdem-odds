@@ -43,6 +43,18 @@ export function PlayingCard({ card, size = 'md' }: { card: Card; size?: Size }) 
   )
 }
 
+// Verso da carta: mostrado no modo "esconder" para ninguém ver sua mão.
+export function CardBack({ size = 'md' }: { size?: Size }) {
+  return (
+    <span
+      className={`${SIZES[size].box} flex items-center justify-center border-2 border-gold/60 bg-surface-high bg-[repeating-linear-gradient(45deg,rgba(245,197,66,0.12)_0_6px,transparent_6px_12px)] shadow-[0_4px_12px_rgba(4,26,19,0.6)]`}
+      aria-label="Carta oculta"
+    >
+      <span className="flex h-9 w-9 items-center justify-center rounded-full border border-gold/60 bg-surface font-display text-lg text-gold">♠</span>
+    </span>
+  )
+}
+
 type SlotProps = {
   card: Card | null
   label: string

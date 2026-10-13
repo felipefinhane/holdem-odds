@@ -1,9 +1,9 @@
-import { Minus, Plus, Settings, Spade, Users } from 'lucide-react'
-import { type ReactNode, useMemo, useState } from 'react'
+import { Eye, EyeOff, Lock, Minus, Plus, Settings, Spade, Users } from 'lucide-react'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { CardPicker } from './components/CardPicker'
 import { DecisionPanel } from './components/DecisionPanel'
 import { EquityPanel, FinalHandPanel, Label, OutsPanel, Section } from './components/Panels'
-import { CardSlot } from './components/PlayingCard'
+import { CardBack, CardSlot } from './components/PlayingCard'
 import { SettingsScreen } from './components/SettingsScreen'
 import { advise, planAction } from './lib/advice'
 import type { Card } from './lib/cards'
@@ -36,6 +36,20 @@ export default function App() {
   const [pot, setPot] = useState('')
   const [bet, setBet] = useState('')
   const [stack, setStack] = useState(String(config.startingStack))
+  // Modo "esconder": protege suas cartas e probabilidades quando o celular fica na mesa.
+  const [hidden, setHidden] = useStoredState('holdem-odds:hidden', false, (value) => typeof value === 'boolean')
+
+  // Esconde sozinho quando a tela apaga ou você troca de app.
+  useEffect(() => {
+    const hideOnLeave = () => document.hidden && setHidden(true)
+    document.addEventListener('visibilitychange', hideOnLeave)
+    return () => document.removeEventListener('visibilitychange', hideOnLeave)
+  }, [setHidden])
+
+  const toggleHidden = () => {
+    if (!hidden && active !== null && active < 2) setActive(null)
+    setHidden(!hidden)
+  }
 
   const hero = filled(slots.slice(0, 2))
   const flop = filled(slots.slice(2, 5))
@@ -91,14 +105,14 @@ export default function App() {
       <header className="fixed inset-x-0 top-0 z-30 bg-surface/90 pt-[env(safe-area-inset-top)] shadow-[0_4px_16px_rgba(0,18,11,0.5)] backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-[430px] items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-container text-gold">
+            <span className="hidden h-9 w-9 items-center justify-center rounded-lg bg-surface-container text-gold min-[400px]:flex">
               <Spade size={20} />
             </span>
             <div>
               <p className="font-display text-xl leading-tight font-semibold">
                 Holdem <span className="text-gold">Odds</span>
               </p>
-              <p className="flex items-center gap-1 font-display text-[10px] font-semibold tracking-wide text-secondary">
+              <p className="flex items-center gap-1 font-display text-[10px] font-semibold tracking-wide whitespace-nowrap text-secondary">
                 <span className="h-1.5 w-1.5 rounded-full bg-gold" />
                 Stack: {formatChips(parseAmount(stack))} · Blinds {formatChips(config.smallBlind)}/{formatChips(config.bigBlind)}
               </p>
@@ -107,8 +121,19 @@ export default function App() {
           <div className="flex items-center gap-1">
             <button
               type="button"
+              onClick={toggleHidden}
+              className={`flex h-11 w-11 items-center justify-center rounded-lg transition active:scale-95 ${
+                hidden ? 'bg-gold/15 text-gold ring-1 ring-gold/60' : 'text-secondary active:bg-surface-container'
+              }`}
+              aria-label={hidden ? 'Mostrar informações' : 'Esconder informações'}
+              aria-pressed={hidden}
+            >
+              {hidden ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
+            <button
+              type="button"
               onClick={newHand}
-              className="flex min-h-11 items-center gap-1 rounded-lg bg-gold px-3 font-display text-sm font-bold text-on-gold shadow-[0_0_12px_rgba(245,197,66,0.3)] active:scale-95"
+              className="flex min-h-11 items-center gap-1 rounded-lg bg-gold px-2.5 font-display text-sm font-bold whitespace-nowrap text-on-gold shadow-[0_0_12px_rgba(245,197,66,0.3)] active:scale-95"
             >
               <Plus size={16} /> Nova mão
             </button>
@@ -122,7 +147,14 @@ export default function App() {
             </button>
           </div>
         </div>
-        {advice && result && (
+        {hidden ? (
+          <div className="mx-auto flex max-w-[430px] items-center gap-2 px-4 pb-2 font-display text-xs font-bold text-gold">
+            <Lock size={14} /> Informações ocultas
+            <span className="ml-auto flex items-center gap-1 text-secondary">
+              <Users size={14} /> {opponents} {opponents === 1 ? 'oponente' : 'oponentes'}
+            </span>
+          </div>
+        ) : advice && result && (
           <div className="mx-auto flex max-w-[430px] items-center gap-2 px-4 pb-2 font-display text-xs font-bold">
             <span className={`rounded px-2 py-1 ${actionPlan?.allIn ? 'bg-danger text-white' : SUMMARY_STYLES[advice.action]}`}>
               {actionPlan?.allIn ? 'ALL-IN' : advice.title}
@@ -136,27 +168,40 @@ export default function App() {
         )}
       </header>
 
-      <main className={`mx-auto flex max-w-[430px] flex-col gap-3 px-4 pb-10 ${advice ? 'pt-28' : 'pt-20'}`}>
+      <main className={`mx-auto flex max-w-[430px] flex-col gap-3 px-4 pb-10 ${advice || hidden ? 'pt-28' : 'pt-20'}`}>
         <Section title="Sua mão">
           <div className="flex gap-3">
             <div className="flex gap-2">
-              {[0, 1].map((index) => (
+              {[0, 1].map((index) =>
+                hidden && slots[index] !== null ? (
+                  <CardBack key={index} size="lg" />
+                ) : (
                 <CardSlot
                   key={index}
                   size="lg"
                   card={slots[index]}
                   label={SLOT_LABELS[index]}
                   active={active === index}
+                  disabled={hidden}
                   onClick={() => setActive(index)}
                 />
-              ))}
+                ),
+              )}
             </div>
             <div className="min-w-0 flex-1">
               <Label>Combinação atual</Label>
-              <p className="font-display text-lg leading-tight font-semibold text-gold">
-                {handScore !== null ? describeHand(handScore) : 'Escolha suas 2 cartas'}
-              </p>
-              {drawSummary && <p className="mt-1 text-xs text-secondary">{drawSummary}</p>}
+              {hidden ? (
+                <p className="flex items-center gap-1.5 font-display text-lg leading-tight font-semibold text-secondary">
+                  <Lock size={16} /> Oculta
+                </p>
+              ) : (
+                <>
+                  <p className="font-display text-lg leading-tight font-semibold text-gold">
+                    {handScore !== null ? describeHand(handScore) : 'Escolha suas 2 cartas'}
+                  </p>
+                  {drawSummary && <p className="mt-1 text-xs text-secondary">{drawSummary}</p>}
+                </>
+              )}
             </div>
           </div>
         </Section>
@@ -199,7 +244,22 @@ export default function App() {
           </div>
         </Section>
 
-        {result === null || advice === null ? (
+        {hidden ? (
+          <section className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-gold/40 bg-surface-container px-4 py-8 text-center">
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-gold/15 text-gold">
+              <EyeOff size={28} />
+            </span>
+            <p className="font-display text-lg font-semibold">Suas cartas e probabilidades estão ocultas</p>
+            <p className="text-sm text-secondary">Seguro para deixar o celular na mesa. A mesa e os adversários continuam visíveis.</p>
+            <button
+              type="button"
+              onClick={toggleHidden}
+              className="mt-1 flex h-12 items-center gap-2 rounded-xl bg-gold px-6 font-display font-bold text-on-gold active:scale-95"
+            >
+              <Eye size={20} /> Mostrar
+            </button>
+          </section>
+        ) : result === null || advice === null ? (
           <p className="py-6 text-center text-secondary">Escolha as suas 2 cartas para ver as probabilidades.</p>
         ) : (
           <>
@@ -250,7 +310,7 @@ export default function App() {
         )}
       </main>
 
-      {active !== null && (
+      {active !== null && !(hidden && active < 2) && (
         <CardPicker
           key={active}
           title={`Escolher: ${active < 2 ? 'sua ' + SLOT_LABELS[active].toLowerCase() : SLOT_LABELS[active]}`}

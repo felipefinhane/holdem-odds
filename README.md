@@ -8,6 +8,7 @@ Você escolhe as suas cartas e as da mesa, e o app mostra:
 - **Recomendação de jogada**: diz se vale continuar na mão e qual ação tomar (**FOLD**, **CHECK**, **PAGUE**, **APOSTE**, **AUMENTE** ou **ALL-IN**), com o tamanho da aposta em fichas, em BB e quais fichas colocar no pote
 - **Configuração da mesa**: stack inicial, blinds e as fichas do jogo (cor, valor e quantidade). Fica salva no navegador
 - **Bandeja de fichas**: monte o pote e a aposta tocando nas fichas, como na mesa
+- **Modo esconder** (ícone de olho): vira suas cartas e oculta probabilidades e recomendação, para deixar o celular na mesa. Liga sozinho quando a tela apaga ou você troca de app
 - **Pot odds**: com o pote e a aposta, mostra a chance mínima para pagar, o lucro médio do call e até quanto vale pagar
 - **Outs**: as cartas que melhoram sua mão, agrupadas por jogada, com a regra do 2 e do 4 lado a lado com a conta exata
 - **Chance de terminar com** cada tipo de mão (par, trinca, flush…) até o river
