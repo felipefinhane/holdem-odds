@@ -1,0 +1,24 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-felt: #0c3b2e;
+  --color-felt-dark: #072a20;
+  --color-felt-light: #155a45;
+  --color-spade: #0f172a;
+  --color-heart: #dc2626;
+  --color-diamond: #2563eb;
+  --color-club: #15803d;
+  --color-gold: #f5c542;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+html,
+body {
+  background: var(--color-felt-dark);
+  color: white;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input[type='number']::-webkit-inner-spin-button {
+  appearance: none;
+}
