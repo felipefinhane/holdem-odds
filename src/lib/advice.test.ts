@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { advise, classifyStrength } from './advice'
+import { advise, classifyStrength, planAction } from './advice'
+import { DEFAULT_CONFIG } from './table'
 
 const base = { opponents: 1, boardSize: 3, pot: 100, bet: 0, outs: 0 }
 
@@ -63,5 +64,26 @@ describe('advise com aposta para pagar', () => {
     const advice = advise({ ...base, equity: 0.85, bet: 30 })
     expect(advice.action).toBe('raise')
     expect(advice.sizing?.amount).toBe(90)
+  })
+})
+
+describe('planAction', () => {
+  it('aposta sugerida vira fichas reais', () => {
+    const plan = planAction(advise({ ...base, equity: 0.8 }), 0, 1000, DEFAULT_CONFIG)
+    expect(plan).toMatchObject({ amount: 67, bigBlinds: 6.7, allIn: false })
+  })
+
+  it('aumento maior que o stack vira all-in', () => {
+    const plan = planAction(advise({ ...base, equity: 0.85, bet: 200 }), 200, 340, DEFAULT_CONFIG)
+    expect(plan).toMatchObject({ amount: 340, allIn: true })
+  })
+
+  it('call usa o valor da aposta', () => {
+    const plan = planAction(advise({ ...base, boardSize: 4, equity: 0.196, bet: 20, outs: 9 }), 20, 1000, DEFAULT_CONFIG)
+    expect(plan?.amount).toBe(20)
+  })
+
+  it('fold e check não colocam fichas', () => {
+    expect(planAction(advise({ ...base, equity: 0.3 }), 0, 1000, DEFAULT_CONFIG)).toBeNull()
   })
 })

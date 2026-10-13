@@ -1,5 +1,6 @@
 import { formatPercent } from './format'
 import { potOdds } from './potOdds'
+import { type BetPlan, planBet, type TableConfig } from './table'
 
 export type Action = 'fold' | 'check' | 'call' | 'bet' | 'raise'
 export type Strength = 'strong' | 'medium' | 'weak'
@@ -105,4 +106,11 @@ export function advise(input: AdviceInput): Advice {
     reason: `O preço compensa: você precisa de ${formatPercent(odds.required)} e tem ${formatPercent(equity)}.`,
     note: strength === 'weak' ? 'Sua mão ainda não é forte. Se vier outra aposta grande, refaça a conta.' : null,
   })
+}
+
+// Fichas que a ação recomendada coloca no pote (call, aposta ou aumento), já limitadas ao seu stack.
+export function planAction(advice: Advice, bet: number, stack: number, config: TableConfig): BetPlan | null {
+  if (advice.action === 'call') return planBet(bet, stack, config)
+  if ((advice.action === 'bet' || advice.action === 'raise') && advice.sizing?.amount) return planBet(advice.sizing.amount, stack, config)
+  return null
 }
