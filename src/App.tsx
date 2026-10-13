@@ -1,13 +1,19 @@
-import { useMemo, useState } from 'react'
+import { Minus, Plus, Settings, Spade, Users } from 'lucide-react'
+import { type ReactNode, useMemo, useState } from 'react'
 import { CardPicker } from './components/CardPicker'
-import { AdvicePanel, EquityPanel, FinalHandPanel, OutsPanel, PotOddsPanel, Section } from './components/Panels'
-import { advise } from './lib/advice'
+import { DecisionPanel } from './components/DecisionPanel'
+import { EquityPanel, FinalHandPanel, Label, OutsPanel, Section } from './components/Panels'
 import { CardSlot } from './components/PlayingCard'
+import { SettingsScreen } from './components/SettingsScreen'
+import { advise, planAction } from './lib/advice'
 import type { Card } from './lib/cards'
-import { describeHand, evaluate } from './lib/evaluate'
+import { describeHand, evaluate, HAND_CATEGORIES } from './lib/evaluate'
+import { formatChips, formatPercent, parseAmount } from './lib/format'
 import { countOuts } from './lib/outs'
 import { potOdds } from './lib/potOdds'
+import { DEFAULT_CONFIG, isTableConfig } from './lib/table'
 import { useEquity } from './lib/useEquity'
+import { useStoredState } from './lib/useStoredState'
 
 // Posições: 0-1 sua mão, 2-4 flop, 5 turn, 6 river.
 const SLOT_LABELS = ['Carta 1', 'Carta 2', 'Flop', 'Flop', 'Flop', 'Turn', 'River']
@@ -20,14 +26,16 @@ const STREETS = [
 const EMPTY: (Card | null)[] = Array(7).fill(null)
 
 const filled = (cards: (Card | null)[]) => cards.filter((card): card is Card => card !== null)
-const parseAmount = (text: string) => Number(text.replace(',', '.'))
 
 export default function App() {
+  const [config, setConfig] = useStoredState('holdem-odds:config', DEFAULT_CONFIG, isTableConfig)
+  const [showSettings, setShowSettings] = useState(false)
   const [slots, setSlots] = useState(EMPTY)
   const [active, setActive] = useState<number | null>(0)
   const [opponents, setOpponents] = useState(1)
   const [pot, setPot] = useState('')
   const [bet, setBet] = useState('')
+  const [stack, setStack] = useState(String(config.startingStack))
 
   const hero = filled(slots.slice(0, 2))
   const flop = filled(slots.slice(2, 5))
@@ -39,12 +47,13 @@ export default function App() {
   const { result, loading } = useEquity(hero.length === 2 ? hero : [], board, opponents)
   const outs = hero.length === 2 ? countOuts(hero, board) : null
   const handScore = hero.length === 2 ? evaluate([...hero, ...board]) : null
-  const potAmount = parseAmount(pot || '0')
-  const betAmount = parseAmount(bet || '0')
+  const potAmount = parseAmount(pot)
+  const betAmount = parseAmount(bet)
   const odds = result ? potOdds(potAmount, betAmount, result.equity) : null
   const advice = result
     ? advise({ equity: result.equity, opponents, boardSize: board.length, pot: potAmount, bet: betAmount, outs: outs?.outs.length ?? 0 })
     : null
+  const actionPlan = advice ? planAction(advice, betAmount, parseAmount(stack), config) : null
 
   const slotDisabled = (index: number) => (index === 5 && !flopComplete) || (index === 6 && !turnComplete)
 
@@ -71,131 +80,171 @@ export default function App() {
     setActive(0)
   }
 
+  const drawSummary = outs?.groups.length
+    ? `${outs.outs.length} outs: ${outs.groups.map(({ category, cards }) => `${HAND_CATEGORIES[category]} (${cards.length})`).join(', ')}`
+    : null
+
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-3 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-10">
-      <header className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">
-          Holdem <span className="text-gold">Odds</span>
-        </h1>
-        <button type="button" onClick={newHand} className="rounded-lg bg-white/10 px-3 py-1.5 text-sm active:bg-white/20">
-          Nova mão
-        </button>
+    <>
+      <header className="fixed inset-x-0 top-0 z-30 bg-surface/90 pt-[env(safe-area-inset-top)] shadow-[0_4px_16px_rgba(0,18,11,0.5)] backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-[430px] items-center justify-between px-4">
+          <div className="flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-container text-gold">
+              <Spade size={20} />
+            </span>
+            <div>
+              <p className="font-display text-xl leading-tight font-semibold">
+                Holdem <span className="text-gold">Odds</span>
+              </p>
+              <p className="flex items-center gap-1 font-display text-[10px] font-semibold tracking-wide text-secondary">
+                <span className="h-1.5 w-1.5 rounded-full bg-gold" />
+                Stack: {formatChips(parseAmount(stack))} · Blinds {formatChips(config.smallBlind)}/{formatChips(config.bigBlind)}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={newHand}
+              className="flex min-h-11 items-center gap-1 rounded-lg bg-gold px-3 font-display text-sm font-bold text-on-gold shadow-[0_0_12px_rgba(245,197,66,0.3)] active:scale-95"
+            >
+              <Plus size={16} /> Nova mão
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowSettings(true)}
+              className="flex h-11 w-11 items-center justify-center rounded-lg text-secondary active:bg-surface-container"
+              aria-label="Configuração da mesa"
+            >
+              <Settings size={20} />
+            </button>
+          </div>
+        </div>
+        {advice && result && (
+          <div className="mx-auto flex max-w-[430px] items-center gap-2 px-4 pb-2 font-display text-xs font-bold">
+            <span className={`rounded px-2 py-1 ${actionPlan?.allIn ? 'bg-danger text-white' : SUMMARY_STYLES[advice.action]}`}>
+              {actionPlan?.allIn ? 'ALL-IN' : advice.title}
+              {actionPlan && ` ${formatChips(actionPlan.amount)}`}
+            </span>
+            <span className="rounded border border-success/40 px-2 py-1 text-success">{formatPercent(result.equity)} chance</span>
+            <span className="ml-auto flex items-center gap-1 text-secondary">
+              <Users size={14} /> {opponents} {opponents === 1 ? 'oponente' : 'oponentes'}
+            </span>
+          </div>
+        )}
       </header>
 
-      <Section title="Sua mão" aside={handScore !== null && <span className="text-sm text-gold">{describeHand(handScore)}</span>}>
-        <div className="flex gap-2">
-          {[0, 1].map((index) => (
-            <CardSlot key={index} card={slots[index]} label={SLOT_LABELS[index]} active={active === index} onClick={() => setActive(index)} />
-          ))}
-        </div>
-      </Section>
-
-      <Section title="Mesa">
-        <div className="flex gap-1.5">
-          {[2, 3, 4, 5, 6].map((index) => (
-            <div key={index} className={index === 5 ? 'ml-2' : index === 6 ? 'ml-1' : ''}>
-              <CardSlot
-                card={slots[index]}
-                label={SLOT_LABELS[index]}
-                active={active === index}
-                disabled={slotDisabled(index)}
-                onClick={() => setActive(index)}
-              />
-            </div>
-          ))}
-        </div>
-        {flop.length > 0 && !flopComplete && <p className="mt-2 text-xs text-amber-200">Complete as 3 cartas do flop para usá-las no cálculo.</p>}
-      </Section>
-
-      <Section title="Adversários">
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => setOpponents(Math.max(1, opponents - 1))}
-            disabled={opponents === 1}
-            className="h-11 w-11 rounded-full bg-white/10 text-2xl disabled:opacity-30"
-            aria-label="Menos adversários"
-          >
-            −
-          </button>
-          <p className="text-center">
-            <span className="text-3xl font-bold">{opponents}</span>
-            <span className="block text-xs text-white/60">ainda na mão</span>
-          </p>
-          <button
-            type="button"
-            onClick={() => setOpponents(Math.min(8, opponents + 1))}
-            disabled={opponents === 8}
-            className="h-11 w-11 rounded-full bg-white/10 text-2xl disabled:opacity-30"
-            aria-label="Mais adversários"
-          >
-            +
-          </button>
-        </div>
-      </Section>
-
-      {result === null ? (
-        <p className="py-6 text-center text-white/70">Escolha as suas 2 cartas para ver as probabilidades.</p>
-      ) : (
-        <>
-          <Section title="Probabilidade" aside={loading && <span className="text-xs text-white/50">calculando…</span>}>
-            <EquityPanel result={result} loading={loading} opponents={opponents} />
-          </Section>
-
-          <Section title="Decisão">
-            <div className="grid grid-cols-2 gap-2">
-              <AmountInput label="Pote antes da aposta" value={pot} onChange={setPot} />
-              <AmountInput label="Aposta para pagar" placeholder="ninguém apostou" value={bet} onChange={setBet} />
-            </div>
-            <div className="mt-2 flex gap-2">
-              {(
-                [
-                  ['Sem aposta', 0],
-                  ['½ pote', 0.5],
-                  ['⅔ pote', 2 / 3],
-                  ['Pote', 1],
-                ] as const
-              ).map(([label, fraction]) => (
-                <button
-                  key={label}
-                  type="button"
-                  disabled={fraction > 0 && !(potAmount > 0)}
-                  onClick={() => setBet(fraction === 0 ? '' : String(Math.round(potAmount * fraction)))}
-                  className="flex-1 rounded-lg bg-white/10 py-2 text-sm active:bg-white/20 disabled:opacity-30"
-                >
-                  {label}
-                </button>
+      <main className={`mx-auto flex max-w-[430px] flex-col gap-3 px-4 pb-10 ${advice ? 'pt-28' : 'pt-20'}`}>
+        <Section title="Sua mão">
+          <div className="flex gap-3">
+            <div className="flex gap-2">
+              {[0, 1].map((index) => (
+                <CardSlot
+                  key={index}
+                  size="lg"
+                  card={slots[index]}
+                  label={SLOT_LABELS[index]}
+                  active={active === index}
+                  onClick={() => setActive(index)}
+                />
               ))}
             </div>
-            {advice && (
-              <div className="mt-3">
-                <AdvicePanel advice={advice} />
-              </div>
-            )}
-            {odds && (
-              <div className="mt-4 border-t border-white/10 pt-4">
-                <PotOddsPanel odds={odds} equity={result.equity} pot={potAmount} bet={betAmount} />
-              </div>
-            )}
-          </Section>
+            <div className="min-w-0 flex-1">
+              <Label>Combinação atual</Label>
+              <p className="font-display text-lg leading-tight font-semibold text-gold">
+                {handScore !== null ? describeHand(handScore) : 'Escolha suas 2 cartas'}
+              </p>
+              {drawSummary && <p className="mt-1 text-xs text-secondary">{drawSummary}</p>}
+            </div>
+          </div>
+        </Section>
 
-          {outs && (
-            <Section title="Outs">
-              <OutsPanel outs={outs} />
+        <Section
+          title="Mesa"
+          aside={
+            potAmount > 0 && (
+              <span className="font-display text-sm text-secondary">
+                Pote: <b className="text-gold">{formatChips(potAmount)}</b>
+              </span>
+            )
+          }
+        >
+          <div className="flex gap-1.5">
+            {[2, 3, 4, 5, 6].map((index) => (
+              <div key={index} className={index === 5 ? 'ml-1.5' : ''}>
+                <CardSlot
+                  card={slots[index]}
+                  label={SLOT_LABELS[index]}
+                  active={active === index}
+                  disabled={slotDisabled(index)}
+                  onClick={() => setActive(index)}
+                />
+              </div>
+            ))}
+          </div>
+          {flop.length > 0 && !flopComplete && <p className="mt-2 text-xs text-gold">Complete as 3 cartas do flop para usá-las no cálculo.</p>}
+        </Section>
+
+        <Section title="Adversários na mão" subtitle="Mais adversários reduzem sua chance">
+          <div className="-mt-1 flex items-center justify-end gap-3">
+            <StepperButton label="Menos adversários" disabled={opponents === 1} onClick={() => setOpponents(opponents - 1)}>
+              <Minus size={20} />
+            </StepperButton>
+            <span className="w-10 text-center font-display text-4xl font-bold text-gold tabular-nums">{opponents}</span>
+            <StepperButton label="Mais adversários" disabled={opponents === 8} onClick={() => setOpponents(opponents + 1)}>
+              <Plus size={20} />
+            </StepperButton>
+          </div>
+        </Section>
+
+        {result === null || advice === null ? (
+          <p className="py-6 text-center text-secondary">Escolha as suas 2 cartas para ver as probabilidades.</p>
+        ) : (
+          <>
+            <Section title="Probabilidade" aside={loading && <span className="text-xs text-secondary">calculando…</span>}>
+              <EquityPanel result={result} loading={loading} opponents={opponents} />
             </Section>
-          )}
 
-          <Section title={board.length === 5 ? 'Sua mão final' : 'Chance de terminar com'}>
-            <FinalHandPanel result={result} />
-          </Section>
+            <Section title={<span className="text-2xl text-gold">Decisão</span>} className="ring-1 ring-gold/25">
+              <DecisionPanel
+                advice={advice}
+                equity={result.equity}
+                odds={odds}
+                config={config}
+                pot={pot}
+                bet={bet}
+                stack={stack}
+                onPotChange={setPot}
+                onBetChange={setBet}
+                onStackChange={setStack}
+              />
+            </Section>
 
-          <p className="text-center text-xs text-white/40">
-            Simulação com {result.iterations.toLocaleString('pt-BR')} mãos aleatórias · margem de erro ≈ 0,5%
-            <br />
-            Os adversários recebem cartas aleatórias. Quem continua apostando costuma ter mão melhor, então seja mais conservador.
-          </p>
-        </>
-      )}
+            {outs && (
+              <Section
+                title="Outs disponíveis"
+                aside={
+                  <span className="rounded bg-success/15 px-2 py-0.5 font-display text-xs font-bold text-success">
+                    {outs.outs.length} cartas vivas
+                  </span>
+                }
+              >
+                <OutsPanel outs={outs} />
+              </Section>
+            )}
+
+            <Section title={board.length === 5 ? 'Sua mão final' : 'Chance de terminar com'} aside={<Label>até o river</Label>}>
+              <FinalHandPanel result={result} />
+            </Section>
+
+            <p className="text-center text-xs text-secondary/70">
+              Simulação com {result.iterations.toLocaleString('pt-BR')} mãos aleatórias · margem de erro ≈ 0,5%
+              <br />
+              Os adversários recebem cartas aleatórias. Quem continua apostando costuma ter mão melhor, então seja mais conservador.
+            </p>
+          </>
+        )}
+      </main>
 
       {active !== null && (
         <CardPicker
@@ -208,24 +257,40 @@ export default function App() {
           onClose={() => setActive(null)}
         />
       )}
-    </main>
+
+      {showSettings && (
+        <SettingsScreen
+          config={config}
+          onClose={() => setShowSettings(false)}
+          onSave={(next) => {
+            setConfig(next)
+            setStack(String(next.startingStack))
+            setShowSettings(false)
+          }}
+        />
+      )}
+    </>
   )
 }
 
-type AmountInputProps = { label: string; value: string; placeholder?: string; onChange: (value: string) => void }
+const SUMMARY_STYLES = {
+  fold: 'bg-danger text-white',
+  check: 'bg-surface-highest text-on-surface',
+  call: 'bg-success text-surface-lowest',
+  bet: 'bg-gold text-on-gold',
+  raise: 'bg-gold text-on-gold',
+}
 
-function AmountInput({ label, value, placeholder = '0', onChange }: AmountInputProps) {
+function StepperButton({ children, label, disabled, onClick }: { children: ReactNode; label: string; disabled: boolean; onClick: () => void }) {
   return (
-    <label className="block">
-      <span className="text-xs text-white/60">{label}</span>
-      <input
-        type="text"
-        inputMode="decimal"
-        placeholder={placeholder}
-        value={value}
-        onChange={(event) => onChange(event.target.value.replace(/[^\d.,]/g, ''))}
-        className="mt-1 w-full rounded-lg bg-black/30 px-3 py-2.5 text-lg font-semibold tabular-nums placeholder:text-sm placeholder:font-normal ring-1 ring-white/15 outline-none focus:ring-gold"
-      />
-    </label>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className="flex h-12 w-12 items-center justify-center rounded-lg bg-surface-high active:scale-95 disabled:opacity-30"
+    >
+      {children}
+    </button>
   )
 }
