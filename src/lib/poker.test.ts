@@ -120,6 +120,20 @@ describe('potOdds', () => {
     expect(potOdds(100, result.maxCall, 0.2)!.expectedValue).toBeCloseTo(0)
   })
 
+  it('com vários adversários, conta a aposta de cada um no pote', () => {
+    const result = potOdds(0, 10, 0.214, 8)!
+    expect(result.finalPot).toBe(90)
+    expect(result.required).toBeCloseTo(1 / 9)
+    expect(result.verdict).toBe('call')
+    expect(result.maxCall).toBe(Infinity)
+  })
+
+  it('o maior call com 2 adversários tem EV zero', () => {
+    const result = potOdds(100, 10, 0.25, 2)!
+    expect(result.maxCall).toBeCloseTo(100)
+    expect(potOdds(100, result.maxCall, 0.25, 2)!.expectedValue).toBeCloseTo(0)
+  })
+
   it('ignora aposta vazia', () => {
     expect(potOdds(100, 0, 0.5)).toBeNull()
   })

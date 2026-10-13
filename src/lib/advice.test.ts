@@ -60,6 +60,13 @@ describe('advise com aposta para pagar', () => {
     expect(advise({ ...base, boardSize: 4, equity: 0.196, bet: 20, outs: 9 }).action).toBe('call')
   })
 
+  it('JJ pré-flop pagando 1 BB não é fold, mesmo contra muitos adversários', () => {
+    // Equities simuladas do JJ contra 1, 3, 5 e 8 mãos aleatórias.
+    for (const [opponents, equity] of [[1, 0.774], [3, 0.488], [5, 0.338], [8, 0.214]]) {
+      expect(advise({ ...base, boardSize: 0, opponents, equity, pot: 15, bet: 10 }).continueHand).toBe(true)
+    }
+  })
+
   it('favorito com preço bom: aumenta para 3× a aposta', () => {
     const advice = advise({ ...base, equity: 0.85, bet: 30 })
     expect(advice.action).toBe('raise')

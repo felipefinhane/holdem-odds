@@ -86,7 +86,7 @@ export function advise(input: AdviceInput): Advice {
     })
   }
 
-  const odds = potOdds(pot, bet, equity)!
+  const odds = potOdds(pot, bet, equity, opponents)!
   if (odds.verdict === 'fold') {
     const close = odds.required - equity < 0.05 && boardSize >= 3 && boardSize < 5 && input.outs >= 8
     return make('fold', {

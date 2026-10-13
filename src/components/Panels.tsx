@@ -73,9 +73,10 @@ export const Stat = ({ label, value, tone = 'text-on-surface' }: { label: string
   </div>
 )
 
-type PotOddsProps = { odds: PotOddsResult; equity: number; pot: number; bet: number }
+type PotOddsProps = { odds: PotOddsResult; equity: number; pot: number; bet: number; opponents: number }
 
-export function PotOddsPanel({ odds, equity, pot, bet }: PotOddsProps) {
+export function PotOddsPanel({ odds, equity, pot, bet, opponents }: PotOddsProps) {
+  const theirBets = opponents === 1 ? `${formatChips(bet)} (aposta)` : `${opponents} × ${formatChips(bet)} (adversários)`
   const favorable = odds.verdict === 'call'
   return (
     <div className="space-y-3 rounded-xl bg-surface-lowest p-3">
@@ -108,18 +109,19 @@ export function PotOddsPanel({ odds, equity, pot, bet }: PotOddsProps) {
         </summary>
         <ol className="mt-2 list-decimal space-y-1 pl-5">
           <li>
-            Pote final = {formatChips(pot)} + {formatChips(bet)} (aposta) + {formatChips(bet)} (seu call) ={' '}
+            Pote final = {formatChips(pot)} + {theirBets} + {formatChips(bet)} (seu call) ={' '}
             <b className="text-on-surface">{formatChips(odds.finalPot)}</b>
           </li>
           <li>
             Chance mínima = {formatChips(bet)} ÷ {formatChips(odds.finalPot)} = <b className="text-on-surface">{formatPercent(odds.required)}</b>
           </li>
           <li>
-            Lucro médio = {formatPercent(equity)} × {formatChips(pot + bet)} − {formatPercent(1 - equity)} × {formatChips(bet)} ={' '}
+            Lucro médio = {formatPercent(equity)} × {formatChips(pot + odds.opponentsMoney)} − {formatPercent(1 - equity)} × {formatChips(bet)} ={' '}
             <b className="text-on-surface">{formatSignedChips(odds.expectedValue)}</b>
           </li>
         </ol>
         <p className="mt-2 text-xs">
+          {opponents > 1 && `A chance de vencer considera os ${opponents} adversários até o fim, então a conta considera que todos pagam a aposta. `}
           Considera que você vê todas as cartas até o river. Apostas futuras (implied odds) podem justificar um call um pouco abaixo da
           conta.
         </p>

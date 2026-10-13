@@ -14,7 +14,10 @@ type Props = {
   equity: number
   odds: PotOddsResult | null
   config: TableConfig
+  opponents: number
   pot: string
+  // Valor do pote quando o campo está vazio antes do flop (os blinds).
+  blinds: number | null
   bet: string
   stack: string
   onPotChange: (value: string) => void
@@ -25,14 +28,14 @@ type Props = {
 const formatBB = (amount: number, bigBlind: number) => `${formatChips(toBigBlinds(amount, bigBlind))} BB`
 
 export function DecisionPanel(props: Props) {
-  const { advice, equity, odds, config, pot, bet, stack, onPotChange, onBetChange, onStackChange } = props
+  const { advice, equity, odds, config, opponents, pot, bet, blinds, stack, onPotChange, onBetChange, onStackChange } = props
   const [active, setActive] = useState<Field>('pot')
   const [history, setHistory] = useState<{ field: Field; value: string }[]>([])
   const [editingStack, setEditingStack] = useState(false)
 
   const values = { pot, bet }
   const setters = { pot: onPotChange, bet: onBetChange }
-  const potAmount = parseAmount(pot)
+  const potAmount = pot === '' && blinds !== null ? blinds : parseAmount(pot)
   const betAmount = parseAmount(bet)
   const stackAmount = parseAmount(stack)
 
@@ -89,9 +92,10 @@ export function DecisionPanel(props: Props) {
         <AmountField
           label="Pote antes da aposta"
           value={pot}
+          placeholder={blinds !== null ? `${formatChips(blinds)} (blinds)` : '0'}
           active={active === 'pot'}
           bigBlinds={formatBB(potAmount, config.bigBlind)}
-          hint={potAmount > 0 ? `${formatChips(potAmount)} fichas no meio` : 'Toque nas fichas abaixo'}
+          hint={pot === '' && blinds !== null ? 'Só os blinds, por enquanto' : potAmount > 0 ? `${formatChips(potAmount)} fichas no meio` : 'Toque nas fichas abaixo'}
           onFocus={() => setActive('pot')}
           onChange={(value) => change('pot', value)}
         />
@@ -166,7 +170,7 @@ export function DecisionPanel(props: Props) {
         </p>
       )}
 
-      {odds && <PotOddsPanel odds={odds} equity={equity} pot={potAmount} bet={betAmount} />}
+      {odds && <PotOddsPanel odds={odds} equity={equity} pot={potAmount} bet={betAmount} opponents={opponents} />}
     </div>
   )
 }

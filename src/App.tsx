@@ -47,9 +47,11 @@ export default function App() {
   const { result, loading } = useEquity(hero.length === 2 ? hero : [], board, opponents)
   const outs = hero.length === 2 ? countOuts(hero, board) : null
   const handScore = hero.length === 2 ? evaluate([...hero, ...board]) : null
-  const potAmount = parseAmount(pot)
+  // Antes do flop o pote nunca está vazio: com o campo em branco, valem os blinds.
+  const blinds = board.length === 0 ? config.smallBlind + config.bigBlind : null
+  const potAmount = pot === '' && blinds !== null ? blinds : parseAmount(pot)
   const betAmount = parseAmount(bet)
-  const odds = result ? potOdds(potAmount, betAmount, result.equity) : null
+  const odds = result ? potOdds(potAmount, betAmount, result.equity, opponents) : null
   const advice = result
     ? advise({ equity: result.equity, opponents, boardSize: board.length, pot: potAmount, bet: betAmount, outs: outs?.outs.length ?? 0 })
     : null
@@ -211,7 +213,9 @@ export default function App() {
                 equity={result.equity}
                 odds={odds}
                 config={config}
+                opponents={opponents}
                 pot={pot}
+                blinds={blinds}
                 bet={bet}
                 stack={stack}
                 onPotChange={setPot}
