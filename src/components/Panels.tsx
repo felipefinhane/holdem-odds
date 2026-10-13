@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import type { Action, Advice } from '../lib/advice'
 import type { EquityResult } from '../lib/equity'
 import { HAND_CATEGORIES } from '../lib/evaluate'
 import { formatChips, formatPercent, formatSignedChips } from '../lib/format'
@@ -49,17 +50,50 @@ export function EquityPanel({ result, loading, opponents }: { result: EquityResu
   )
 }
 
+const ACTION_STYLES: Record<Action, string> = {
+  fold: 'bg-red-500 text-white',
+  check: 'bg-slate-200 text-slate-900',
+  call: 'bg-emerald-500 text-white',
+  bet: 'bg-gold text-felt-dark',
+  raise: 'bg-gold text-felt-dark',
+}
+
+const STRENGTH_LABELS = { strong: 'Forte', medium: 'Média', weak: 'Fraca' }
+
+export function AdvicePanel({ advice }: { advice: Advice }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-white/70">Continuar na mão?</span>
+        <span className={`rounded-full px-3 py-0.5 font-bold ${advice.continueHand ? 'bg-emerald-400/20 text-emerald-300' : 'bg-red-400/20 text-red-300'}`}>
+          {advice.continueHand ? 'Sim' : 'Não'}
+        </span>
+      </div>
+      <div className={`rounded-xl p-4 text-center ${ACTION_STYLES[advice.action]}`}>
+        <p className="text-4xl font-black tracking-wider">{advice.title}</p>
+        {advice.sizing && (
+          <p className="mt-1 text-lg font-semibold">
+            {advice.sizing.amount !== null ? `${formatChips(advice.sizing.amount)} fichas · ` : ''}
+            {advice.sizing.label}
+          </p>
+        )}
+      </div>
+      <p className="text-sm">{advice.reason}</p>
+      <p className="text-xs text-white/60">
+        Força da mão: <b className="text-white">{STRENGTH_LABELS[advice.strength]}</b> · sua chance comparada à parte justa de{' '}
+        {formatPercent(advice.fairShare)} (o que cada jogador teria se todos fossem iguais)
+      </p>
+      {advice.note && <p className="rounded-lg bg-amber-300/10 p-2 text-xs text-amber-200">{advice.note}</p>}
+    </div>
+  )
+}
+
 export function PotOddsPanel({ odds, equity, pot, bet }: { odds: PotOddsResult; equity: number; pot: number; bet: number }) {
-  const isCall = odds.verdict === 'call'
   return (
     <div className="space-y-3">
-      <div className={`rounded-xl p-3 text-center ${isCall ? 'bg-emerald-500' : 'bg-red-500'}`}>
-        <p className="text-3xl font-black tracking-wider">{isCall ? 'CALL' : 'FOLD'}</p>
-        <p className="text-sm">
-          Você tem {formatPercent(equity)} e precisa de {formatPercent(odds.required)}
-        </p>
-      </div>
-
+      <p className="text-sm font-medium">
+        Pagar a aposta: você tem {formatPercent(equity)} e precisa de {formatPercent(odds.required)}
+      </p>
       <div className="relative h-4 rounded-full bg-white/10">
         <div className="h-full rounded-full bg-sky-400" style={{ width: `${Math.min(equity, 1) * 100}%` }} />
         <div className="absolute -top-1 h-6 w-0.5 bg-gold" style={{ left: `${odds.required * 100}%` }} />

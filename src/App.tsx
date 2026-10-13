@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { CardPicker } from './components/CardPicker'
-import { EquityPanel, FinalHandPanel, OutsPanel, PotOddsPanel, Section } from './components/Panels'
+import { AdvicePanel, EquityPanel, FinalHandPanel, OutsPanel, PotOddsPanel, Section } from './components/Panels'
+import { advise } from './lib/advice'
 import { CardSlot } from './components/PlayingCard'
 import type { Card } from './lib/cards'
 import { describeHand, evaluate } from './lib/evaluate'
@@ -38,7 +39,12 @@ export default function App() {
   const { result, loading } = useEquity(hero.length === 2 ? hero : [], board, opponents)
   const outs = hero.length === 2 ? countOuts(hero, board) : null
   const handScore = hero.length === 2 ? evaluate([...hero, ...board]) : null
-  const odds = result ? potOdds(parseAmount(pot || '0'), parseAmount(bet), result.equity) : null
+  const potAmount = parseAmount(pot || '0')
+  const betAmount = parseAmount(bet || '0')
+  const odds = result ? potOdds(potAmount, betAmount, result.equity) : null
+  const advice = result
+    ? advise({ equity: result.equity, opponents, boardSize: board.length, pot: potAmount, bet: betAmount, outs: outs?.outs.length ?? 0 })
+    : null
 
   const slotDisabled = (index: number) => (index === 5 && !flopComplete) || (index === 6 && !turnComplete)
 
@@ -136,36 +142,41 @@ export default function App() {
             <EquityPanel result={result} loading={loading} opponents={opponents} />
           </Section>
 
-          <Section title="Pote">
+          <Section title="Decisão">
             <div className="grid grid-cols-2 gap-2">
               <AmountInput label="Pote antes da aposta" value={pot} onChange={setPot} />
-              <AmountInput label="Aposta para pagar" value={bet} onChange={setBet} />
+              <AmountInput label="Aposta para pagar" placeholder="ninguém apostou" value={bet} onChange={setBet} />
             </div>
-            {parseAmount(pot) > 0 && (
-              <div className="mt-2 flex gap-2">
-                {[
+            <div className="mt-2 flex gap-2">
+              {(
+                [
+                  ['Sem aposta', 0],
                   ['½ pote', 0.5],
                   ['⅔ pote', 2 / 3],
                   ['Pote', 1],
-                ].map(([label, fraction]) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => setBet(String(Math.round(parseAmount(pot) * (fraction as number))))}
-                    className="flex-1 rounded-lg bg-white/10 py-2 text-sm active:bg-white/20"
-                  >
-                    {label}
-                  </button>
-                ))}
+                ] as const
+              ).map(([label, fraction]) => (
+                <button
+                  key={label}
+                  type="button"
+                  disabled={fraction > 0 && !(potAmount > 0)}
+                  onClick={() => setBet(fraction === 0 ? '' : String(Math.round(potAmount * fraction)))}
+                  className="flex-1 rounded-lg bg-white/10 py-2 text-sm active:bg-white/20 disabled:opacity-30"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {advice && (
+              <div className="mt-3">
+                <AdvicePanel advice={advice} />
               </div>
             )}
-            <div className="mt-3">
-              {odds ? (
-                <PotOddsPanel odds={odds} equity={result.equity} pot={parseAmount(pot || '0')} bet={parseAmount(bet)} />
-              ) : (
-                <p className="text-sm text-white/60">Informe o pote e a aposta para saber se o call vale a pena.</p>
-              )}
-            </div>
+            {odds && (
+              <div className="mt-4 border-t border-white/10 pt-4">
+                <PotOddsPanel odds={odds} equity={result.equity} pot={potAmount} bet={betAmount} />
+              </div>
+            )}
           </Section>
 
           {outs && (
@@ -201,17 +212,19 @@ export default function App() {
   )
 }
 
-function AmountInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+type AmountInputProps = { label: string; value: string; placeholder?: string; onChange: (value: string) => void }
+
+function AmountInput({ label, value, placeholder = '0', onChange }: AmountInputProps) {
   return (
     <label className="block">
       <span className="text-xs text-white/60">{label}</span>
       <input
         type="text"
         inputMode="decimal"
-        placeholder="0"
+        placeholder={placeholder}
         value={value}
         onChange={(event) => onChange(event.target.value.replace(/[^\d.,]/g, ''))}
-        className="mt-1 w-full rounded-lg bg-black/30 px-3 py-2.5 text-lg font-semibold tabular-nums ring-1 ring-white/15 outline-none focus:ring-gold"
+        className="mt-1 w-full rounded-lg bg-black/30 px-3 py-2.5 text-lg font-semibold tabular-nums placeholder:text-sm placeholder:font-normal ring-1 ring-white/15 outline-none focus:ring-gold"
       />
     </label>
   )
