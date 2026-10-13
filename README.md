@@ -8,7 +8,7 @@ Você escolhe as suas cartas e as da mesa, e o app mostra:
 - **Recomendação de jogada**: diz se vale continuar na mão e qual ação tomar (**FOLD**, **CHECK**, **PAGUE**, **APOSTE**, **AUMENTE** ou **ALL-IN**), com o tamanho da aposta em fichas, em BB e quais fichas colocar no pote
 - **Configuração da mesa**: stack inicial, blinds e as fichas do jogo (cor, valor e quantidade). Fica salva no navegador
 - **Bandeja de fichas**: monte o pote e a aposta tocando nas fichas, como na mesa
-- **Modo esconder** (ícone de olho): vira suas cartas e oculta probabilidades e recomendação, para deixar o celular na mesa. Nas configurações você escolhe entre **tocar para mostrar/esconder** (liga sozinho quando a tela apaga) ou **segurar para espiar** (só aparece enquanto você segura o olho)
+- **Modo esconder** (ícone de olho): vira suas cartas e oculta probabilidades e recomendação, para deixar o celular na mesa. Esconder é um toque; para mostrar, escolha nas configurações entre **um toque**, **toque duplo** ou **segurar meio segundo**. Pode **esconder sozinho** após 15 s, 30 s ou 1 min sem mexer, e sempre esconde quando a tela apaga
 - **Pot odds**: com o pote e a aposta, mostra a chance mínima para pagar, o lucro médio do call e até quanto vale pagar
 - **Outs**: as cartas que melhoram sua mão, agrupadas por jogada, com a regra do 2 e do 4 lado a lado com a conta exata
 - **Chance de terminar com** cada tipo de mão (par, trinca, flush…) até o river
@@ -59,7 +59,7 @@ src/
 │   ├── table.ts         # configuração da mesa, fichas, BB e all-in
 │   ├── useStoredState.ts # estado salvo no navegador
 │   ├── preferences.ts   # preferências (modo de privacidade)
-│   ├── usePeek.ts       # "segurar para espiar"
+│   ├── useReveal.ts     # gestos para mostrar e esconder sozinho
 │   ├── equity.worker.ts # roda a simulação fora da thread principal
 │   ├── useEquity.ts     # hook React que conversa com o worker
 │   └── *.test.ts

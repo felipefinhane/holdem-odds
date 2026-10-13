@@ -1,13 +1,20 @@
-// Como as informações escondidas voltam a aparecer:
-// 'toggle' = um toque esconde e outro mostra; 'hold' = só aparecem enquanto você segura o botão.
-export type RevealMode = 'toggle' | 'hold'
+// Gesto no botão de olho para mostrar as informações escondidas. Esconder é sempre um toque.
+export type RevealGesture = 'tap' | 'double-tap' | 'long-press'
 
 export type Preferences = {
-  revealMode: RevealMode
+  revealGesture: RevealGesture
+  // Esconde sozinho depois desse tempo sem mexer no celular (0 = nunca).
+  autoHideSeconds: number
 }
 
-export const DEFAULT_PREFERENCES: Preferences = { revealMode: 'toggle' }
+export const AUTO_HIDE_OPTIONS = [0, 15, 30, 60]
+
+export const DEFAULT_PREFERENCES: Preferences = { revealGesture: 'tap', autoHideSeconds: 0 }
 
 export function isPreferences(value: unknown): value is Preferences {
-  return typeof value === 'object' && value !== null && ['toggle', 'hold'].includes((value as Preferences).revealMode)
+  if (typeof value !== 'object' || value === null) return false
+  const preferences = value as Preferences
+  return (
+    ['tap', 'double-tap', 'long-press'].includes(preferences.revealGesture) && AUTO_HIDE_OPTIONS.includes(preferences.autoHideSeconds)
+  )
 }

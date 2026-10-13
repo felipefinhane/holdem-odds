@@ -40,3 +40,18 @@ body {
 .recessed {
   box-shadow: inset 0 2px 4px 0 #041a13;
 }
+
+/* Enche o botão enquanto você segura para mostrar (mesmo tempo de LONG_PRESS_MS). */
+.press-fill {
+  transform-origin: left;
+  animation: press-fill 500ms linear forwards;
+}
+
+@keyframes press-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}

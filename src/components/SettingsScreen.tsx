@@ -1,7 +1,7 @@
-import { AlertTriangle, ArrowLeft, ArrowLeftRight, CheckCircle2, Coins, Eye, Hand, Plus, RotateCcw, ShieldCheck, Trash2, Wallet } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ArrowLeftRight, CheckCircle2, Coins, Hand, MousePointerClick, Plus, Pointer, RotateCcw, ShieldCheck, Trash2, Wallet } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { formatChips, parseAmount } from '../lib/format'
-import { DEFAULT_PREFERENCES, type Preferences, type RevealMode } from '../lib/preferences'
+import { AUTO_HIDE_OPTIONS, DEFAULT_PREFERENCES, type Preferences, type RevealGesture } from '../lib/preferences'
 import { CHIP_COLORS, type ChipColor, chipsTotal, DEFAULT_CONFIG, type TableConfig, toBigBlinds } from '../lib/table'
 import { Chip } from './Chip'
 
@@ -165,18 +165,20 @@ export function SettingsScreen({ config, preferences, onSave, onClose }: Props) 
           </Card>
 
           <Card icon={<ShieldCheck size={20} />} title="Privacidade">
-            <p className="mb-2 text-sm text-secondary">Como o botão de olho mostra suas cartas e probabilidades escondidas:</p>
-            <div className="space-y-2" role="radiogroup" aria-label="Modo de privacidade">
-              {REVEAL_MODES.map(({ mode, icon, title, description }) => {
-                const selected = draftPreferences.revealMode === mode
+            <p className="mb-2 text-sm text-secondary">
+              Para <b className="text-on-surface">mostrar</b> as informações escondidas, no botão de olho:
+            </p>
+            <div className="space-y-2" role="radiogroup" aria-label="Gesto para mostrar">
+              {REVEAL_GESTURES.map(({ gesture, icon, title, description }) => {
+                const selected = draftPreferences.revealGesture === gesture
                 return (
                   <button
-                    key={mode}
+                    key={gesture}
                     type="button"
                     role="radio"
                     aria-checked={selected}
-                    onClick={() => setDraftPreferences({ ...draftPreferences, revealMode: mode })}
-                    className={`flex w-full items-start gap-3 rounded-lg p-3 text-left transition ${
+                    onClick={() => setDraftPreferences({ ...draftPreferences, revealGesture: gesture })}
+                    className={`flex w-full items-start gap-3 rounded-lg p-3 text-left ${
                       selected ? 'bg-gold/10 ring-2 ring-gold' : 'bg-surface-lowest ring-1 ring-surface-highest'
                     }`}
                   >
@@ -194,6 +196,29 @@ export function SettingsScreen({ config, preferences, onSave, onClose }: Props) 
                 )
               })}
             </div>
+            <p className="mt-2 text-xs text-secondary">Para esconder, basta um toque no olho.</p>
+
+            <p className="mt-4 mb-2 text-sm text-secondary">
+              <b className="text-on-surface">Esconder sozinho</b> depois de um tempo sem mexer no celular:
+            </p>
+            <div className="grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Esconder sozinho">
+              {AUTO_HIDE_OPTIONS.map((seconds) => {
+                const selected = draftPreferences.autoHideSeconds === seconds
+                return (
+                  <button
+                    key={seconds}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setDraftPreferences({ ...draftPreferences, autoHideSeconds: seconds })}
+                    className={`h-11 rounded-lg font-display text-sm font-semibold ${selected ? 'bg-gold text-on-gold' : 'bg-surface-high text-secondary'}`}
+                  >
+                    {seconds === 0 ? 'Nunca' : seconds < 60 ? `${seconds} s` : '1 min'}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="mt-2 text-xs text-secondary">A contagem recomeça a cada toque, então não esconde enquanto você digita uma aposta.</p>
           </Card>
 
           <button
@@ -220,18 +245,19 @@ export function SettingsScreen({ config, preferences, onSave, onClose }: Props) 
   )
 }
 
-const REVEAL_MODES: { mode: RevealMode; icon: ReactNode; title: string; description: string }[] = [
+const REVEAL_GESTURES: { gesture: RevealGesture; icon: ReactNode; title: string; description: string }[] = [
+  { gesture: 'tap', icon: <Pointer size={22} />, title: 'Um toque', description: 'Mais rápido. Pode abrir sem querer se alguém encostar.' },
   {
-    mode: 'toggle',
-    icon: <Eye size={22} />,
-    title: 'Tocar para mostrar/esconder',
-    description: 'Um toque esconde, outro mostra. Esconde sozinho quando a tela apaga.',
+    gesture: 'double-tap',
+    icon: <MousePointerClick size={22} />,
+    title: 'Toque duplo',
+    description: 'Dois toques rápidos no olho. Difícil de abrir por acidente.',
   },
   {
-    mode: 'hold',
+    gesture: 'long-press',
     icon: <Hand size={22} />,
-    title: 'Segurar para espiar',
-    description: 'Fica sempre escondido e só aparece enquanto você segura o olho. Ao soltar, esconde de novo.',
+    title: 'Segurar meio segundo',
+    description: 'Segure o olho até encher. Depois fica aberto para você rolar e digitar.',
   },
 ]
 

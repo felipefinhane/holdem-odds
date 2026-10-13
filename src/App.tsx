@@ -1,5 +1,5 @@
-import { Eye, EyeOff, Hand, Lock, Minus, Plus, Settings, Spade, Users } from 'lucide-react'
-import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { Eye, EyeOff, Lock, Minus, Plus, Settings, Spade, Users } from 'lucide-react'
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { CardPicker } from './components/CardPicker'
 import { DecisionPanel } from './components/DecisionPanel'
 import { EquityPanel, FinalHandPanel, Label, OutsPanel, Section } from './components/Panels'
@@ -12,9 +12,9 @@ import { formatChips, formatPercent, parseAmount } from './lib/format'
 import { countOuts } from './lib/outs'
 import { potOdds } from './lib/potOdds'
 import { DEFAULT_CONFIG, isTableConfig } from './lib/table'
-import { DEFAULT_PREFERENCES, isPreferences } from './lib/preferences'
+import { DEFAULT_PREFERENCES, isPreferences, type RevealGesture } from './lib/preferences'
 import { useEquity } from './lib/useEquity'
-import { usePeek } from './lib/usePeek'
+import { useAutoHide, useRevealGesture } from './lib/useReveal'
 import { useStoredState } from './lib/useStoredState'
 
 // Posições: 0-1 sua mão, 2-4 flop, 5 turn, 6 river.
@@ -39,22 +39,22 @@ export default function App() {
   const [bet, setBet] = useState('')
   const [stack, setStack] = useState(String(config.startingStack))
   // Modo "esconder": protege suas cartas e probabilidades quando o celular fica na mesa.
-  // No modo "segurar", fica escondido e só aparece enquanto o botão está pressionado.
+  // Mostrar usa o gesto escolhido nas configurações; esconder é sempre um toque.
   const [preferences, setPreferences] = useStoredState('holdem-odds:preferences', DEFAULT_PREFERENCES, isPreferences)
-  const [hiddenByToggle, setHiddenByToggle] = useStoredState('holdem-odds:hidden', false, (value) => typeof value === 'boolean')
-  const { peeking, handlers: peekHandlers } = usePeek()
-  const holdMode = preferences.revealMode === 'hold'
-  const hidden = holdMode ? !peeking : hiddenByToggle
+  const [hidden, setHidden] = useStoredState('holdem-odds:hidden', false, (value) => typeof value === 'boolean')
+  const hide = useCallback(() => setHidden(true), [setHidden])
+  const reveal = useRevealGesture(preferences.revealGesture, () => setHidden(false))
+  useAutoHide(!hidden, preferences.autoHideSeconds, hide)
 
   // Esconde sozinho quando a tela apaga ou você troca de app.
   useEffect(() => {
-    const hideOnLeave = () => document.hidden && setHiddenByToggle(true)
+    const hideOnLeave = () => document.hidden && hide()
     document.addEventListener('visibilitychange', hideOnLeave)
     return () => document.removeEventListener('visibilitychange', hideOnLeave)
-  }, [setHiddenByToggle])
+  }, [hide])
 
-  // Mesmo botão, dois comportamentos: tocar alterna; segurar mostra enquanto pressionado.
-  const revealButton = holdMode ? peekHandlers : { onClick: () => setHiddenByToggle(!hiddenByToggle) }
+  const eyeButton = hidden ? reveal.handlers : { onClick: hide }
+  const hint = REVEAL_HINTS[preferences.revealGesture]
 
   const hero = filled(slots.slice(0, 2))
   const flop = filled(slots.slice(2, 5))
@@ -126,14 +126,15 @@ export default function App() {
           <div className="flex items-center gap-1">
             <button
               type="button"
-              {...revealButton}
-              className={`flex h-11 w-11 touch-none items-center justify-center rounded-lg transition select-none active:scale-95 ${
-                hidden ? 'bg-gold/15 text-gold ring-1 ring-gold/60' : 'text-secondary active:bg-surface-container'
-              }`}
-              aria-label={holdMode ? 'Segure para ver as informações' : hidden ? 'Mostrar informações' : 'Esconder informações'}
+              {...eyeButton}
+              className={`relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg transition select-none active:scale-95 ${
+                hidden ? `bg-gold/15 text-gold ring-1 ring-gold/60 ${GESTURE_TOUCH[preferences.revealGesture]}` : 'text-secondary active:bg-surface-container'
+              } ${hidden && reveal.armed ? 'ring-2' : ''}`}
+              aria-label={hidden ? hint.label : 'Esconder informações'}
               aria-pressed={!hidden}
             >
-              {hidden ? <EyeOff size={20} /> : <Eye size={20} />}
+              {hidden && reveal.armed && preferences.revealGesture === 'long-press' && <span className="press-fill absolute inset-0 bg-gold/40" />}
+              <span className="relative">{hidden ? <EyeOff size={20} /> : <Eye size={20} />}</span>
             </button>
             <button
               type="button"
@@ -154,7 +155,7 @@ export default function App() {
         </div>
         {hidden ? (
           <div className="mx-auto flex max-w-[430px] items-center gap-2 px-4 pb-2 font-display text-xs font-bold text-gold">
-            <Lock size={14} /> {holdMode ? 'Segure o olho para ver' : 'Informações ocultas'}
+            <Lock size={14} /> {reveal.armed ? hint.armed : hint.header}
             <span className="ml-auto flex items-center gap-1 text-secondary">
               <Users size={14} /> {opponents} {opponents === 1 ? 'oponente' : 'oponentes'}
             </span>
@@ -257,18 +258,12 @@ export default function App() {
             <p className="text-sm text-secondary">Seguro para deixar o celular na mesa. A mesa e os adversários continuam visíveis.</p>
             <button
               type="button"
-              {...revealButton}
-              className="mt-1 flex h-12 touch-none items-center gap-2 rounded-xl bg-gold px-6 font-display font-bold text-on-gold select-none active:scale-95"
+              {...reveal.handlers}
+              className={`relative mt-1 flex h-12 items-center gap-2 overflow-hidden rounded-xl bg-gold px-6 font-display font-bold text-on-gold select-none active:scale-95 ${GESTURE_TOUCH[preferences.revealGesture]}`}
             >
-              {holdMode ? (
-                <>
-                  <Hand size={20} /> Segure para ver
-                </>
-              ) : (
-                <>
-                  <Eye size={20} /> Mostrar
-                </>
-              )}
+              {reveal.armed && preferences.revealGesture === 'long-press' && <span className="press-fill absolute inset-0 bg-on-gold/25" />}
+              <Eye size={20} className="relative" />
+              <span className="relative">{reveal.armed ? hint.armed : hint.button}</span>
             </button>
           </section>
         ) : result === null || advice === null ? (
@@ -351,6 +346,25 @@ export default function App() {
     </>
   )
 }
+
+const REVEAL_HINTS: Record<RevealGesture, { label: string; header: string; button: string; armed: string }> = {
+  tap: { label: 'Mostrar informações', header: 'Toque no olho para ver', button: 'Mostrar', armed: 'Mostrar' },
+  'double-tap': {
+    label: 'Toque duas vezes para mostrar',
+    header: 'Toque 2× no olho para ver',
+    button: 'Toque 2× para mostrar',
+    armed: 'Toque de novo…',
+  },
+  'long-press': {
+    label: 'Segure para mostrar',
+    header: 'Segure o olho para ver',
+    button: 'Segure para mostrar',
+    armed: 'Continue segurando…',
+  },
+}
+
+// Toque duplo não pode virar zoom; segurar não pode virar rolagem.
+const GESTURE_TOUCH: Record<RevealGesture, string> = { tap: '', 'double-tap': 'touch-manipulation', 'long-press': 'touch-none' }
 
 const SUMMARY_STYLES = {
   fold: 'bg-danger text-white',
